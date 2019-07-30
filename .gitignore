@@ -1,0 +1,15 @@
+.nfs*
+*.swp
+*.swo
+*~
+*.so
+*.egg
+*.bak
+*.pyc
+*Log.out
+*.log
+*.DS_Store
+
+.mypy_cache
+*.egg-info
+*__pycache__*
