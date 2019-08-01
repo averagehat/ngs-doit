@@ -1,5 +1,5 @@
 from ngs_doit.pipetypes import Fasta, Fastq, Bam, Bai, VCF, PNG ,FPath, Sam, P
-from typing import List, Tuple, Dict, Callable,Union, Any,Optional, TypeVar, Type
+from typing import List, Tuple, Dict, Callable,Union, Any,Optional, TypeVar, Type #, Set
 from typing_extensions import TypedDict, Literal
 
 # the type for get_var is something like
@@ -64,11 +64,19 @@ Job = TypedDict('Job',
           'actions' : List[Action] })
 
 GetArgs = Dict[str, Tuple[str, str]]
-GetArgsJob = TypedDict('GetArgsJob', { 'getargs' : GetArgs, 
+# could do some cute b.s. with kwarg typing & generics but generics unsupported for typeddict
+BoolArgJob = TypedDict('BoolArgJob', { 'getargs' : GetArgs, 
          'file_dep' : List[FPath],
           'targets' : List[FPath],
-          'actions' : List[Action] })
+          'actions' : List[GAction[bool]] })
+
+class CmdAction: ...
+from typing import TypeVar
+T = TypeVar('T')
+# from doit.action import CmdAction  # type:ignore
+GAction = Union[CmdAction, Callable[[List[FPath], List[FPath], T], ActionReturn]] 
 Failure = Literal[False]
+
 def task_trimmomatic() -> Union[Job, Failure]:
     # could also have this at the "main level" of the file :(
     cfg: Config = yaml.load(open(args['config']))
@@ -83,11 +91,12 @@ def task_trimmomatic() -> Union[Job, Failure]:
         nonempty: Callable[[FPath],bool] = lambda f: os.stat(f).st_size > 0 
         subprocess.getoutput(f"trimmomatic PE {dependencies[0]} {dependencies[1]} \
                 %(targets)s LEADING:{q} TRAILING:{q} HEADCROP:{hc}")
-        return { 'unpaired-reads' : nonempty(targets[1]) or nonempty(targets[3]) }
+        return { 'unpaired_reads' : nonempty(targets[1]) or nonempty(targets[3]) }
 
     return { 'targets' : [ FPath('trimmed.R1').fastq,  Fastq('unpaired_trimmed_R1.fastq'), FPath('Trimmed.R2').fastq, Fastq('unpaired_trimmed_R2.fastq')],
              'file_dep' : [r2, r1],
              'actions' : [run_trim] }
+
 
 def task_bwa_index() -> Job:
 
@@ -95,35 +104,29 @@ def task_bwa_index() -> Job:
              'file_dep' : [ref] ,
              'actions' : [ "bwa index %(dependencies)s" ] 
              }
+Arg = str # (there is probably a smarter way do this)
+# need a special action type to accept the argument hmm
+#GAction = Union[str, Callable[[List[FPath], List[FPath]], ActionReturn]]
+#ActionReturn = Union[Failure, None, Dict[str, bool]]
 
-def task_bwa_mem() -> Job:
-    # needs to dynamically whether or not unpaired_fwd from trimmed reads are empty files or not; alternatively, whether or not they exist.
-    # could just have merged-bam be the ending output, and so no worries. problem with this is that paired and unpaired could be paralleizable but meh
-
-    # these are actually paths right?
-    # let sorting be a seperator process 
-    def bwa_mem(targets: List[FPath], dependencies: List[FPath]) -> None:
-        nonempty: Callable[[FPath],bool] = lambda f: os.stat(f).st_size > 0 
+def task_bwa_test() -> BoolArgJob:
+    #note: unpaired_reads is a special arg
+    def bwa_mem_action(targets: List[FPath], dependencies: List[FPath], unpaired_reads: bool) -> None:
         r1, r2, u1, u2 = targets
-        paired_bam =   Bam('paired.bam')
-        unpaired_bam = Bam('unpaired.bam')
-        final_bam = Bam(dependencies[0]) # eh? == unsorted_bam
-    # could use overload types somehow
-        def map_paired(outpath: Bam) -> None:
-            subprocess.getoutput(f"bwa mem {r1} {r2} -o {outpath}")
-        if nonempty(dependencies[0]) or nonempty(dependencies[1]):
-            unpaired = Fastq("unpaired.fastq")
-            subprocess.getoutput(f"cat {u1} {u2} > {unpaired}")
-            map_paired(paired_bam)
-            subprocess.getoutput(f"samtools merge {unpaired_bam} {paired_bam} > {final_bam}")
-            os.remove(unpaired_bam)
-            os.remove(paired_bam) # otherwise the targets change!
+        paired_bam = Bam('paired.bam')
+        if unpaired_reads:
+            unpaired_bam = Bam('unpaired.bam')
         else:
-            map_paired(final_bam) # but doesn't sort :(
-
+            pass 
+        subprocess.call(f"touch {targets}")
+        return None
+            
     return { 'targets' : [unsorted_bam],
              'file_dep' : index_files + [trimmed_r1, trimmed_r2, up_trimmed1, up_trimmed2], 
-             'actions' : [ bwa_mem ] }
+             'actions' : [ bwa_mem_action ],
+             'getargs'   : { 'unpaired_reads' : ('trimmomatic', 'unpaired_reads')} }
+             
+
 
 def task_sort_bam() -> Job:
     # how can these targets and dependencies be parameterizable like they are in, say, `dagr`?
