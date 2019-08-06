@@ -4,6 +4,7 @@ set -x
 
 if [[ -z "$1" ]]; then
     echo "Requires install prefix for new miniconda as an argument. i.e. /home/user/vartable/miniconda"
+    exit 1
 fi 
     
 curl -sSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o miniconda3.sh
