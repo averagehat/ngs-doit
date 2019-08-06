@@ -115,6 +115,32 @@ def task_fqstats():
                 'file_dep' : [trimmed_r1, trimmed_r2], 
                 'actions' : ['fqstats -o %(targets)s %(dependencies)s'] }
 
+def task_read_qual_dist():
+    qual_score_dist_txt, qual_score_dist_pdf =  'qual_score_dist.txt', 'qual_score_dist.pdf'
+    return { 'targets' : [qual_score_dist_txt, qual_score_dist_pdf],
+             'file_dep' : [ref, sorted_bam],
+             'actions' : f"picard QualityScoreDistribution I={sorted_bam} R={ref} \
+                              O={qual_score_dist_txt} CHART={qual_score_dist_pdf}" }
+
+from pathlib import PurePosixPath
+from ngs_doit import plotting
+from ngs_doit.plotting import PileupOptions, plot_coverage
+
+def task_coverge_plot():
+    #TODO: minbq, alloworphans, overlap etc comes comes from config
+    basepath = PurePosixPath('qualdepth')
+    formats = ['html', 'json'] # + PNG if ocra or w/e installed
+    tgts = list(map(basepath.with_suffix, formats))
+    do_orphans, do_overlaps, minbq = True, False, 0
+    plotfunc = lambda ds, ts: plotting.plot_coverage(ds[0], ts[0].with_suffix(''),
+                      format=formats, orphans=do_orphans, 
+                      overlaps=do_overlaps, minbq=minbq)
+    return { 'targets' : tgts,
+             'file_dep' : [sorted_bam],
+             'actions' : [plotfunc] }
+
+
+
 from typing import Optional
 from typing_extensions import TypedDict
 Args = TypedDict('Args', 
