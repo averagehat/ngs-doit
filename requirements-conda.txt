@@ -15,6 +15,7 @@ picard=2.20.4
 
 trimmomatic
 bwa 
-R
+R # for picard
+cd-hit-auxtools 
 
 # java-jdk=8.0.45=0 ????

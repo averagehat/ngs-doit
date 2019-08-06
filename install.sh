@@ -16,7 +16,11 @@ if [ "$PYTHON_VERSION" != "3.7" ]
 fi
 
 conda update -y -n base -c defaults conda # want conda 4.7
-conda install -y -c bioconda bam-readcount
+
+conda config --add channels bioconda
+conda config --add channels conda-forge
+conda install -y --file requirements-conda.txt
+
 pip install -r pip-requirements.txt
 pip install git+https://github.com/python/mypy   # currently requires mypy for typing_extensions
 python setup.py install
