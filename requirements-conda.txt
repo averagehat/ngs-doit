@@ -1,18 +1,20 @@
-biopython==1.66
-docopt==0.6.2
-numpy==1.11.0
-PyYAML==3.11
-six==1.10.0
-snowballstemmer==1.2.1
+# python packages
+biopython
+click
+plotly
 
+
+PyYAML==3.11
+pysam==0.15.3
 
 # Non python packages
-ncurses=5.9=4
-java-jdk=8.0.45=0
-libpng=1.6.17=0
-zlib=1.2.8=0
-bwa==0.7.12 # Previous version was 0.7.6a from setup.py
-samtools==0.1.19_ccf1da91b # See issue #202
-trimmomatic==0.35 # Previous version was 0.32 from setup.py
-imagemagick==6.9.3
-igv==2.3.65
+
+samtools=1.9
+picard=2.20.4
+
+
+trimmomatic
+bwa 
+R
+
+# java-jdk=8.0.45=0 ????
