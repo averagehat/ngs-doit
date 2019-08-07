@@ -1,3 +1,4 @@
 sut:
   build: .
-  command: bash -c "pip install -r test/test-requirements.txt && test/bin/testrunner.sh"
+  command: bash -c "cd /src/ && pip install -r test/test-requirements.txt && test/bin/testrunner.sh"
+  container_name:  ci_sut_1

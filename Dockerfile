@@ -4,17 +4,17 @@ MAINTAINER Michael Panciera
 ENV PYTHON_VERSION 3.7
 
 RUN yum -y update && \
-    yum -y install curl bzip2
+    yum -y install curl bzip2 git   # git to allow git+ pip installs, bzip2 for conda
 
-ADD . /ngs_doit
+ADD . /src
 
-WORKDIR /ngs_doit
+WORKDIR /src 
 
-RUN bash install.sh /ngs_doit/miniconda
+RUN  bash install.sh /miniconda
 
-ENV PATH=/ngs_doit/miniconda/bin/:$PATH
+ENV PATH=/miniconda/bin/:$PATH
 
 RUN conda clean --all --yes && \ 
     rm miniconda3.sh && \
-    rmp -e --nodeps curl bzip2 && \ 
+    rpm -e --nodeps curl bzip2 && \ 
     yum clean all # this inherited image should `yum clean all` automatically

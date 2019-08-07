@@ -9,7 +9,7 @@ setup(
     scripts = glob('bin/*'),
     entry_points = {
         'console_scripts': [
-            'ngs_doit_run = ngs_doit.wrapper:main'
+            'ngsmap = ngs_doit.wrapper:main'
           ]
         } )
 
