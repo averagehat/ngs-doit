@@ -4,7 +4,7 @@ click
 plotly
 
 
-PyYAML==3.11
+PyYAML
 pysam==0.15.3
 
 # Non python packages

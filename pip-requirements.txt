@@ -1,3 +1,1 @@
 doit
-git+git://github.com/python/typing_extensions.git
-git+git://github.com/python/typing_extensions.git
