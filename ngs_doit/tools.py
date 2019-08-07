@@ -1,52 +1,43 @@
-import re
-import os
-from pathlib import Path, PurePosixPath
-from typing import Callable, Tuple, Sequence, Optional, Dict, Any, Union, List, NoReturn, Iterator, IO
-from typing_extensions import TypedDict
-from Bio.SeqIO.QualityIO import FastqGeneralIterator
+from Bio.SeqIO.QualityIO import FastqGeneralIterator as FQGen
 from itertools import chain
-#from ngs_doint import Job
+from functools import partial
+from typing import NamedTuple, Iterator, Optional, Tuple
+from typing_extensions import Final
+class FqPair(NamedTuple):
+    fwd: str
+    rev: str
 
-def get_index(fn: Path) -> Optional[Path]:
-    ''' returns index path (ie _I1_ or _I2_)  or none.'''
-    index = re.sub(r'_R([12])_', r'_I\1_', str(fn))
-    return Path(index) if os.path.exists(index) else None
-
-def task_ngs_filter() -> Any: #Job: 
-    filtered1_fq, filtered2_fq = 'filtered.r1.fq', 'filtered.r2.fq'
-    input1_fq, input2_fq = 'r1.f1', 'f2.fq' # args['R1'], args['R2'] 
-    def filter_action(targets: List[str], dependencies: List[str]) -> bool:
-        # index quality min (avg? I don't remember)
-        # avg qual min
-        # N maximum count
-        return False
-    return { 'targets' : [filtered1_fq, filtered2_fq],
-             'file_dep' : [input1_fq, input2_fq],
-             'actions' : [filter_action] }
-
-# below is the type returned by fastqgeneraliterator
+# simplefastq parser (FastqGeneralIterator) returns this type
+# form is (header, sequence, quals)
 Rec = Tuple[str, str, str]
-CHUNKSIZE = 10000   # Set this to whatever you feel reasonable
+PHRED_OFFSET: Final = 33
 
-def fq_filter_parallel(r1p, i1p, r2p, i2p, outR1, outR2, minIndexBQ, keepNs):
-   togen = lambda x: FastqGeneralIterator(open(x))
-   records = zip(togen(r1p), togen(i1p), togen(r2p), togen(i2p))
-   with open(outR1, 'w') as r1File, \
-           open(outR2, 'w') as r2File:
+def fastq_filter(rps: FqPair, indexes: Optional[FqPair], outs: FqPair, minIndexBQ: int, keepNs: bool) -> None: 
 
-       ORD_MIN = minIndexBQ + 33
+   ORD_MIN = minIndexBQ + PHRED_OFFSET
 
-       def keep_rec(x: Tuple[Rec, Rec, Rec, Rec]) -> bool:
-           Iqual1, Iqual2 = x[1][2], x[3][2]
-           bases1, bases2 = x[0][1], x[2][1]
-           qual_good = map(lambda x: x >= ORD_MIN, \
-                       map(ord, chain(Iqual1, Iqual2)))
-           result = (keepNs or (not ('N' in chain(bases1, bases2)))) \
-                   and all(qual_good)
-           return result
+   def keep_rec(r1: Rec, r2: Rec, i1: Optional[Rec], i2: Optional[Rec]) -> Optional[Tuple[Rec, Rec]]:
+       if i1 and i2: 
+           quals = chain(i1[2], i2[2])
+           uni_codes = map(ord, quals)
+           qual_good = all( x >= ORD_MIN for x in uni_codes )
+       bases = chain(r1[1], r2[1])
+       keep = qual_good and (keepNs or (not ('N' in bases)))
+       return (r1, r2) if keep else None
 
-       good = filter(keep_rec, records)
+   with open(outs.fwd, 'w') as fwdout, \
+           open(outs.rev, 'w') as revout, \
+           open(rps.fwd) as fwdin, \
+           open(rps.rev) as revin:
 
-       for r1, _, r2, _ in good:
-           r1File.write("@%s\n%s\n+\n%s\n" % r1 )
-           r2File.write("@%s\n%s\n+\n%s\n" % r2 )
+       if indexes:
+           with open(indexes.fwd) as idxfwd, open(indexes.rev) as idxrev:
+                result = map(keep_rec, FQGen(fwdin), FQGen(revin), FQGen(idxfwd), FQGen(idxrev))
+       else:
+            func = partial(keep_rec, i1=None, i2=None)
+            result = map(func, FQGen(fwdin), FQGen(revin))
+
+       kept = filter(None, result)
+       for fwd, rev in kept:
+           fwdout.write("@%s\n%s\n+\n%s\n" % fwd )
+           revout.write("@%s\n%s\n+\n%s\n" % rev )
