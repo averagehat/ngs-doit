@@ -1,4 +1,3 @@
-# type: ignore
 from doit import create_after, get_var
 import os
 import re
@@ -15,12 +14,12 @@ from ngs_doit.custom_types import (Args,
                                    Failure, PyAction, PathLike, Args)
 
 
-args: Args = {"config" : get_var('config', None),
-              "outdir" : get_var('outdir', None),
-              "ref"    : get_var('ref', None),
-              "r1"     : get_var('r1', None),
-              "r2"     : get_var('r2', None),
-              "sample" : get_var('sample', None)}
+args: Args = {"config" : get_var('config', ''),
+              "outdir" : get_var('outdir', ''),
+              "ref"    : get_var('ref',    ''),
+              "r1"     : get_var('r1',     ''),
+              "r2"     : get_var('r2',     ''),
+              "sample" : get_var('sample', '')}
 
 DOIT_CONFIG = {'action_string_formatting': 'old'}
 
@@ -43,14 +42,15 @@ def task_lofreq_index_ref() -> Job:
             'file_dep' : [ ref ] }
 
 def task_variant_caller() -> IdxBamJob:
-    d = { 'targets' : [lofreq_vcf],
+    d: IdxBamJob = { 'targets' : [lofreq_vcf],
           'file_dep' : [ref, sorted_bam],
           'actions' : [],
           'task_dep' : ['index_bam'] }
     caller = 'lofreq'  # config stuff
     if caller == 'lofreq':
-        d['actions'] +=  ["lofreq call-parallel --pp-threads {threads} -f {ref} {sorted_bam} -o %(targets)s"]
-        d['task_dep'] +=  ['lofreq_index']
+        d['actions'] +=  "lofreq call-parallel --pp-threads {threads} -f {ref} {sorted_bam} -o %(targets)s"
+        d['file_dep'] +=  [ ref_fai ]
+        return d
     else:
         raise NotImplementedError() 
 
@@ -60,14 +60,15 @@ def task_index_bam() -> Job:
              'actions'  : [ "samtools index %(dependencies)s" ] }
 
 
-@create_after(executed='trimmer', target_regex='.*\.sam')
+@create_after(executed='trimmer', target_regex='.*\.sam') # type: ignore
 def task_sort_bam() -> TaskDepJob:
-    nonempty = lambda f: os.stat(f).st_size > 0 
+    nonempty: Callable[[str], bool] = lambda f: os.stat(f).st_size > 0 
     unpaired = nonempty(up1_fq) or nonempty(up2_fq)
-    base_dict = { 'targets' : [sorted_bam],
-                  'actions' : [ 'samtools sort %(dependencies)s -f %(targets)s' ],
-                  'file_dep' : [],
-                  'task_dep' : ['trimmomatic']} # necessary b/c it's a delayed task
+    # annotation necessary b/c of decorator
+    base_dict: TaskDepJob = { 'targets' : [sorted_bam],
+                              'actions' : [ 'samtools sort %(dependencies)s -f %(targets)s' ],
+                              'file_dep' : [],
+                              'task_dep' : ['trimmomatic']} # necessary b/c it's a delayed task
     if unpaired:
         base_dict['file_dep'] += [merged_sam]
     else:
@@ -120,16 +121,21 @@ def get_index(fn: str) -> Optional[str]:
     ''' returns index path (ie _I1_ or _I2_)  or none.'''
     index = re.sub(r'_R([12])_', r'_I\1_', str(fn))
     return index if os.path.exists(index) else None
-
+from .tools import FqPair
 def task_ngs_filter() -> Job:
+    #TODO: get from input 
+    minbq, keepNs = 20, False
     inputI1, inputI2 = get_index(inputR1_fq), get_index(inputR2_fq)
-    has_index = inputI1 and inputI2
-    index_dep =  [inputI1, inputI2] if has_index else []
-    def filter_action(targets: List[str], dependencies: List[str]) -> bool:
-        return False
+    deps = [inputR1_fq, inputR2_fq]
+    if inputI1 and inputI2:
+        deps += [inputI1, inputI2]
+        idxs: Optional[FqPair] = FqPair(inputI1, inputI2)
+    else:
+        idxs = None
     return { 'targets' : [filtered1_fq, filtered2_fq],
-             'file_dep' : [inputR1_fq, inputR2_fq] + index_dep,
-             'actions' : [filter_action] }
+             'file_dep' : deps, 
+             'actions' : [(tools.fastq_filter,  # type: ignore
+                 [FqPair(inputR1_fq, inputR2_fq), idxs, minbq, keepNs] ) ]}
 
 def task_fqstats() -> Job:
     fqstats_png = 'fqstats.png'
@@ -146,8 +152,8 @@ def task_read_qual_dist() -> Job:
     qual_score_dist_txt, qual_score_dist_pdf =  'qual_score_dist.txt', 'qual_score_dist.pdf'
     return { 'targets' : [qual_score_dist_txt, qual_score_dist_pdf],
              'file_dep' : [ref, sorted_bam],
-             'actions' : f"picard QualityScoreDistribution I={sorted_bam} R={ref} \
-                              O={qual_score_dist_txt} CHART={qual_score_dist_pdf}" }
+             'actions' : [ f"picard QualityScoreDistribution I={sorted_bam} R={ref} \
+                              O={qual_score_dist_txt} CHART={qual_score_dist_pdf}" ] }
 
 
 def task_coverge_plot() -> IdxBamJob:
@@ -158,15 +164,15 @@ def task_coverge_plot() -> IdxBamJob:
     return { 'targets' : [ 'qualdepth.json', 'qualdepth.png', 'qualdepth.html' ],
              'file_dep' : [sorted_bam],
              'task_dep' : ['index_bam'],
-             'actions' : [(plotting.plot_coverage, [], 
-                 { 'orphans'  : do_orphans,
+             'actions' : [(plotting.plot_coverage, [],  # type: ignore
+                 { 'orphans'  : do_orphans, 
                    'overlaps' : do_overlaps,
                    'minbq'    : minbq } )] }
 
-def task_length_dist_plot() -> IdxBamJob:
+def task_length_dist_plot() -> Job:
     return { 'targets'  :  [ 'readlength.html', 'readlength.json'],
              'file_dep' : [ trimmed_r1, trimmed_r2 ],
-             'actions' :  [ plotting.plot_length_dist ] }
+             'actions' :  [ plotting.plot_length_dist ] } # type: ignore
     #TODO: minbq, alloworphans, overlap etc comes comes from config
 
 

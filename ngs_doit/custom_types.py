@@ -4,12 +4,12 @@ from typing_extensions import TypedDict, Literal
 from mypy_extensions import (Arg, DefaultArg, NamedArg,
                              DefaultNamedArg, VarArg, KwArg)
 Args = TypedDict('Args', 
-        { 'config' : Optional[str],
-          'outdir' : Optional[str],
-          'ref'    : Optional[str],
-          'R1'     : Optional[str],
-          'R2'     : Optional[str],
-          'sample' : Optional[str] })
+        { 'config' : str,
+          'outdir' : str,
+          'ref'    : str,
+          'r1'     : str,
+          'r2'     : str,
+          'sample' : str })
 
 PathLike = str
 Targets = List[PathLike]

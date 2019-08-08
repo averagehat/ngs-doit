@@ -1,3 +1,4 @@
+# type: ignore
 import pysam 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -102,16 +103,16 @@ def fastq_lengths(f: IO[str]) -> Iterator[int]:
        lengths = map(len, map(atindex(1), recs))
        return lengths
 
-# could calculate any distribution here, i.e. avg quality
 def plot_length_dist(dependencies: List[str], targets: List[str]) -> None:
+# could calculate any distribution here, i.e. avg quality
    #with open(fqpath) as f:
-       lengths = chain.from_iterable(map(fastq_lengths, map(open, dependencies)))
-       counts = Counter(lengths)
-       xs = sorted(counts.keys())
-       ys = [counts[k] for k in xs]
-       fig = go.Figure(go.Scatter(x=xs,y=ys))
-       for p in map(PurePosixPath, targets):
-           save_fig(fig, p.with_suffix(''), p.suffix)
+   lengths = chain.from_iterable(map(fastq_lengths, map(open, dependencies)))
+   counts = Counter(lengths)
+   xs = sorted(counts.keys())
+   ys = [counts[k] for k in xs]
+   fig = go.Figure(go.Scatter(x=xs,y=ys))
+   for p in map(PurePosixPath, targets):
+       save_fig(fig, p.with_suffix(''), p.suffix)
            
 MAX_BASE_QUALITY: Final = 41
 @click.command() # type: ignore
