@@ -1,6 +1,7 @@
 from doit import create_after, get_var
 import os
 import re
+from ngs_doit.tools import FqPair
 from typing import Optional, List, Tuple, Union, Any, Dict, Callable
 from typing_extensions import TypedDict, Literal 
 from mypy_extensions import (Arg, DefaultArg, NamedArg,
@@ -36,11 +37,6 @@ unpaired_compiled_fastq = 'unpcomp.fastq'
 lofreq_vcf = 'lofreq.vcf'
 trimmed_r1, trimmed_r2 = 'trimmedR1.fastq', 'trimmedR2.fastq'
 
-def task_lofreq_index_ref() -> Job: 
-    return { 'targets' : [ref_fai],
-            'actions' : ["lofreq faidx %(dependencies)s"],
-            'file_dep' : [ ref ] }
-
 def task_variant_caller() -> IdxBamJob:
     d: IdxBamJob = { 'targets' : [lofreq_vcf],
           'file_dep' : [ref, sorted_bam],
@@ -60,7 +56,7 @@ def task_index_bam() -> Job:
              'actions'  : [ "samtools index %(dependencies)s" ] }
 
 
-@create_after(executed='trimmer', target_regex='.*\.sam') # type: ignore
+@create_after(executed='trimmomatic', target_regex='.*\.sam') # type: ignore
 def task_sort_bam() -> TaskDepJob:
     nonempty: Callable[[str], bool] = lambda f: os.stat(f).st_size > 0 
     unpaired = nonempty(up1_fq) or nonempty(up2_fq)
@@ -121,7 +117,7 @@ def get_index(fn: str) -> Optional[str]:
     ''' returns index path (ie _I1_ or _I2_)  or none.'''
     index = re.sub(r'_R([12])_', r'_I\1_', str(fn))
     return index if os.path.exists(index) else None
-from .tools import FqPair
+
 def task_ngs_filter() -> Job:
     #TODO: get from input 
     minbq, keepNs = 20, False
