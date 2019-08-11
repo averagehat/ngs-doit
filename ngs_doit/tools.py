@@ -25,18 +25,20 @@ def fastq_filter(rps: FqPair, indexes: Optional[FqPair], outs: FqPair, minIndexB
        keep = qual_good and (keepNs or (not ('N' in bases)))
        return (r1, r2) if keep else None
 
+   
    with open(outs.fwd, 'w') as fwdout, \
            open(outs.rev, 'w') as revout, \
            open(rps.fwd) as fwdin, \
            open(rps.rev) as revin:
-
        if indexes:
-           with open(indexes.fwd) as idxfwd, open(indexes.rev) as idxrev:
-                result = map(keep_rec, FQGen(fwdin), FQGen(revin), FQGen(idxfwd), FQGen(idxrev))
+           idxfwd_f, idxrev_f = FQGen(open(indexes.fwd)), FQGen(open(indexes.rev))
        else:
-            func = partial(keep_rec, i1=None, i2=None)
-            result = map(func, FQGen(fwdin), FQGen(revin))
-
+           idxfwd_f, idxrev_f = [], []
+       result = map(keep_rec, FQGen(fwdin), FQGen(revin), idxfwd_f, idxrev_f)
+#       else:
+#            func = partial(keep_rec, i1=None, i2=None)
+#            result = map(func, FQGen(fwdin), FQGen(revin))
+#
        kept = filter(None, result)
        for fwd, rev in kept:
            fwdout.write("@%s\n%s\n+\n%s\n" % fwd )
