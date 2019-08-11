@@ -85,16 +85,16 @@ def coverage_plot(cs: Sequence[Coverage]) -> Figure:
     return fig
 
 def save_fig(fig: Figure, basepath: str, ft: FigType) -> None:
-    fn = f"{basepath}.{ft}"
-    with open(fn, 'w') as out:
-        if ft == 'html':
-            fig.write_html(out)
-        elif ft == 'png':
-            fig.write_image(out)
-        elif ft == 'json':
-            fig.write_json(out)
-        else:
-            assert "this should never happen."
+    #fn = f"{basepath}.{ft}"
+    out = f"{basepath}.{ft}"
+    if ft == 'html':
+        fig.write_html(out)
+    elif ft == 'png':
+        fig.write_image(out)
+    elif ft == 'json':
+        fig.write_json(out)
+    else:
+        assert False, "this should never happen."
 
 
 
@@ -103,7 +103,7 @@ def fastq_lengths(f: IO[str]) -> Iterator[int]:
        lengths = map(len, map(atindex(1), recs))
        return lengths
 
-def plot_length_dist(dependencies: List[str], targets: List[str]) -> None:
+def plot_length_dist(targets: List[str], dependencies: List[str]) -> None:
 # could calculate any distribution here, i.e. avg quality
    #with open(fqpath) as f:
    lengths = chain.from_iterable(map(fastq_lengths, map(open, dependencies)))
@@ -112,17 +112,18 @@ def plot_length_dist(dependencies: List[str], targets: List[str]) -> None:
    ys = [counts[k] for k in xs]
    fig = go.Figure(go.Scatter(x=xs,y=ys))
    for p in map(PurePosixPath, targets):
-       save_fig(fig, p.with_suffix(''), p.suffix)
+       save_fig(fig, p.with_suffix(''), p.suffix[1:])
            
 MAX_BASE_QUALITY: Final = 41
-@click.command() # type: ignore
-@click.argument('bampath', type=click.Path(exists=True, readable=True)) # type: ignore
-@click.option('--out', type=click.Path(exists=False, writable=True, dir_okay=True), multiple=True) # type: ignore
-@click.option('--orphans/--no-orphans', is_flag=True, default=True) # type: ignore
-@click.option('--overlaps/--no-overlaps', is_flag=True, default=False) # type: ignore
-@click.option('--minbq', type=click.IntRange(0, MAX_BASE_QUALITY), default=0) # type: ignore
-def plot_coverage(targets: Targets, dependencies: FileDeps, orphans: bool, overlaps: bool, minbq: int) -> None:
-    bampath = dependencies[0]
+#@click.command() # type: ignore
+#@click.argument('bampath', type=click.Path(exists=True, readable=True)) # type: ignore
+#@click.option('--out', type=click.Path(exists=False, writable=True, dir_okay=True), multiple=True) # type: ignore
+#@click.option('--orphans/--no-orphans', is_flag=True, default=True) # type: ignore
+#@click.option('--overlaps/--no-overlaps', is_flag=True, default=False) # type: ignore
+#@click.option('--minbq', type=click.IntRange(0, MAX_BASE_QUALITY), default=0) # type: ignore
+#def plot_coverage(targets: Targets, dependencies: FileDeps, orphans: bool, overlaps: bool, minbq: int) -> None:
+def plot_coverage(bampath: str, targets: List[str], orphans: bool, overlaps: bool, minbq: int) -> None:
+    #bampath = dependencies[0]
     assert os.path.exists(bampath +'.bai'), f"Expedcted index file {bampath + '.bai'} not found."
     opts = PileupOptions(minBaseQual=minbq, ignoreOrphans = not orphans, ignoreOverlaps = not overlaps)
     cvgs = full_coverage(bampath, opts)
