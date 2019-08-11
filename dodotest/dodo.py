@@ -1,4 +1,4 @@
-# type: ignore
+# type: ignore 
 from doit import create_after, get_var
 import os
 import re
@@ -120,6 +120,8 @@ def task_fqstats() -> Job:
              'file_dep' : [inputR1_fq, inputR2_fq], 
              'actions' : ['fqstats -o %(targets)s %(dependencies)s'] }
 
+    #TODO: this `create_after` is broken. another exmaple py file in this project may have the working
+    # version. the order of this function matters. Might try chainging the target_regex field.
 @create_after(executed='trimmomatic', target_regex='.\*.bam') # type: ignore
 def task_sort_bam() -> TaskDepJob:
     nonempty: Callable[[str], bool] = lambda f: os.path.exists(f) and os.stat(f).st_size > 10
@@ -148,10 +150,11 @@ def task_coverge_plot() -> IdxBamJob:
     # Could simplify to be like length_dist_plot
     #TODO PNG etc only if ocra or w/e installed
     do_orphans, do_overlaps, minbq = True, False, 0 
-    return { 'targets' : [ 'qualdepth.json', 'qualdepth.png', 'qualdepth.html' ],
+    targets = [ 'qualdepth.json', 'qualdepth.png', 'qualdepth.html' ]
+    return { 'targets' : targets,
              'file_dep' : [sorted_bam, index_bai],
              #'task_dep' : ['index_bam'],
-             'actions' : [(plotting.plot_coverage, [],  # type: ignore
+             'actions' : [(plotting.plot_coverage, [sorted_bam, targets],  # type: ignore
                  { 'orphans'  : do_orphans, 
                    'overlaps' : do_overlaps,
                    'minbq'    : minbq } )] }
@@ -159,11 +162,12 @@ def task_coverge_plot() -> IdxBamJob:
 def task_length_dist_plot() -> Job:
     return { 'targets'  :  [ 'readlength.html', 'readlength.json'],
              'file_dep' : [ inputR1_fq, inputR2_fq ],
-             'actions' :  [ plotting.plot_length_dist ] } # type: ignore
+             'actions' :  [ plotting.plot_length_dist] }
+             #'actions' :  [ (plotting.plot_length_dist, [targets, dependencies], {} )] }
     #TODO: minbq, alloworphans, overlap etc comes comes from config
 
 
-
+#TODO: the order of `dependencies` (and probably `targets`) isn't guaranteed.
 
 def task_index_bam() -> Job:
     return { 'targets'  : [index_bai],
@@ -174,11 +178,14 @@ def task_variant_caller() -> IdxBamJob:
     d: IdxBamJob = { 'targets' : [lofreq_vcf],
           'file_dep' : [ref, sorted_bam, index_bai],
           'actions' : [],
+          'targets' : [ lofreq_vcf ]
           #'task_dep' : ['index_bam'] 
           }
     caller = 'lofreq'  # config stuff
     if caller == 'lofreq':
-        d['actions'] +=  "lofreq call-parallel --pp-threads {threads} -f {ref} {sorted_bam} -o %(targets)s"
+        #TODO: use the parallel caller
+        d['actions'] +=  [f"lofreq call -f {ref} {sorted_bam} -o %(targets)s"]
+        #d['actions'] +=  "lofreq call-parallel --pp-threads {threads} -f {ref} {sorted_bam} -o %(targets)s"
         d['file_dep'] +=  [ ref_fai ]
         return d
     else:
